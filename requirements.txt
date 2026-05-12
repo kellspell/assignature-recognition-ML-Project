@@ -1,0 +1,21 @@
+-e .
+tqdm
+utils
+numpy
+cython
+pillow
+pyYAML
+pandas
+jinja2
+fastapi
+uvicorn
+ipykernel
+matplotlib
+opencv-python
+torch-summary
+dill==0.3.5.1
+albumentations
+python-multipart
+pycocotools
+google-cloud-storage
+apache-airflow==2.4.3
