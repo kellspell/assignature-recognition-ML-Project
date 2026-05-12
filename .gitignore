@@ -1,0 +1,22 @@
+# Dataset — large binary files, not version-controlled
+notebooks/dataset/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+.env/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
