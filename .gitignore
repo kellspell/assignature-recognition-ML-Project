@@ -20,3 +20,6 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Google Cloud SDK
+google-cloud-sdk/
