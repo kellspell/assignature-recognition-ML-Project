@@ -17,6 +17,16 @@ A binary image classifier that distinguishes **forged** from **original** handwr
   - [Evaluation](#evaluation)
   - [Inference](#inference)
   - [Saving & Loading the Model](#saving--loading-the-model)
+- [Part 2 — Production Pipeline](#part-2--production-pipeline)
+  - [Project Structure](#project-structure)
+  - [How to Run](#how-to-run)
+  - [Constants](#constants)
+  - [Artifacts](#artifacts)
+  - [Data Injection](#data-injection)
+  - [Training Pipeline](#training-pipeline)
+  - [Logger](#logger)
+  - [Exception Handler](#exception-handler)
+  - [Utilities](#utilities)
 
 ---
 
@@ -216,4 +226,168 @@ model.eval()
 
 ---
 
-*Documentation is being added incrementally. More sections will cover the rest of the stack as it is built.*
+---
+
+## Part 2 — Production Pipeline
+
+**Entry point:** `main.py`
+
+This part wraps the trained model in a modular, production-style pipeline. Each concern (data ingestion, configuration, logging, error handling) lives in its own module under `src/`.
+
+---
+
+### Project Structure
+
+```
+src/
+├── artifacts/
+│   ├── config_entry.py       # dataclasses for pipeline configuration
+│   └── artifects_entry.py    # dataclasses for pipeline output artifacts
+├── components/
+│   └── data_injection.py     # downloads, unzips, and cleans up the dataset
+├── configurations/
+│   └── gcloud_syncer.py      # gsutil wrapper for GCloud Storage transfers
+├── constants/
+│   └── __init__.py           # shared constants (paths, device, timestamp)
+├── exceptions/
+│   └── __init__.py           # CustomException with file/line enrichment
+├── logger/
+│   └── __init__.py           # file + stream logging setup
+├── pipeline/
+│   └── training.py           # TrainingPipeline — orchestrates all stages
+└── utils/
+    └── main_utils.py         # save/load objects, YAML reader, base64 helper
+```
+
+---
+
+### How to Run
+
+```bash
+python main.py
+```
+
+Prerequisites:
+- Conda environment activated (`tf`)
+- Google Cloud SDK installed and authenticated (`gcloud auth login`)
+- `config/config.yaml` present with `data_injection_config.bucket_name` and `data_injection_config.zip_file_name`
+
+---
+
+### Constants
+
+**File:** `src/constants/__init__.py`
+
+| Constant | Description |
+|---|---|
+| `CONFIG_PATH` | Path to `config/config.yaml` |
+| `TIMESTAMP` | Run timestamp used to namespace artifact directories |
+| `ARTIFACTS_DIR` | `artifacts/<timestamp>/` — root for all pipeline outputs |
+| `DEVIDE` | `torch.device` — CUDA if available, otherwise CPU |
+| `DATA_INJECTION_ARTIFACTS_DIR` | Subfolder name for data injection outputs |
+
+---
+
+### Artifacts
+
+**Files:** `src/artifacts/config_entry.py`, `src/artifacts/artifects_entry.py`
+
+Configuration and output for each pipeline stage are typed dataclasses.
+
+**`DataInjectionConfig`** — built from `config/config.yaml`:
+
+| Field | Description |
+|---|---|
+| `BUCKET_NAME` | GCloud Storage bucket name |
+| `ZIP_FILE_NAME` | Name of the zip file in the bucket |
+| `DATA_INJECTION_ARTIFACTS_DIR` | Local directory where the dataset is extracted |
+| `ZIP_FILE_PATH` | Full local path to the downloaded zip file |
+
+**`DataInjectionArtifacts`** — returned after injection completes:
+
+| Field | Description |
+|---|---|
+| `dataset_path` | Path to the extracted dataset directory |
+
+---
+
+### Data Injection
+
+**File:** `src/components/data_injection.py`
+
+`DataInjection` handles three steps in sequence:
+
+1. **Download** — calls `GCloudSync.sync_file_from_gcloud` to pull `dataset.zip` from GCloud Storage into the artifacts directory via `gsutil cp`
+2. **Unzip** — extracts the zip into the same artifacts directory using `ZipFile`
+3. **Cleanup** — deletes the zip file after extraction
+
+Returns a `DataInjectionArtifacts` instance pointing to the extracted dataset directory.
+
+**GCloud sync command format:**
+```
+gsutil cp gs://<bucket>/<filename> <destination>/
+```
+
+---
+
+### Training Pipeline
+
+**File:** `src/pipeline/training.py`
+
+`TrainingPipeline` is the top-level orchestrator. `run_pipeline()` calls each stage in order and stores its artifact on `self`:
+
+```python
+tracking_pipeline = TrainingPipeline()
+tracking_pipeline.run_pipeline()
+```
+
+Stages completed so far:
+
+| Stage | Method | Status |
+|---|---|---|
+| Data Injection | `start_data_injection()` | Done |
+
+---
+
+### Logger
+
+**File:** `src/logger/__init__.py`
+
+Writes structured log lines to both a timestamped file and stdout:
+
+```
+[2026-05-14 23:15:21,115] root - INFO - <message>
+```
+
+Log files are written to `logs/<timestamp>.log`.
+
+---
+
+### Exception Handler
+
+**File:** `src/exceptions/__init__.py`
+
+`CustomException` enriches every exception with the source file name and line number:
+
+```
+Error occurred python script name [<file>] line number [<line>] error message [<msg>]
+```
+
+Usage throughout the codebase:
+```python
+except Exception as e:
+    raise CustomException(e, sys) from e
+```
+
+---
+
+### Utilities
+
+**File:** `src/utils/main_utils.py`
+
+| Function | Description |
+|---|---|
+| `save_objects(file_path, obj)` | Serializes any Python object to disk using `dill` |
+| `load_objects(file_path)` | Deserializes a `dill`-pickled object from disk |
+| `read_yaml_file(file_path)` | Reads a YAML file and returns it as a dict |
+| `image_to_base64(image)` | Encodes an image file to base64 |
