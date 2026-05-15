@@ -1,8 +1,9 @@
 import os
 import dill
-import sys 
+import sys
 import yaml
 import base64
+from typing import Any
 from src.logger import logging
 from src.exceptions import CustomException
 
@@ -16,7 +17,7 @@ def save_objects(file_path: str, obj: object) -> None:
     except Exception as e:
         raise CustomException(e, sys) from e   
     
-def load_objects(file_path: str) -> object:
+def load_objects(file_path: str) -> Any:
     logging.info("Entered the load_objects method of utils")
     try:
         with open(file_path, 'rb') as file_obj:
