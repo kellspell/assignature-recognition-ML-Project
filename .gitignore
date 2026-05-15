@@ -27,3 +27,7 @@ google-cloud-cli-linux-x86_64.tar.gz
 
 # Artifacts — large output files
 artifacts/
+
+# Runtime directories
+config/
+logs/
