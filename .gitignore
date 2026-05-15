@@ -1,5 +1,6 @@
 # Dataset — large binary files, not version-controlled
 notebooks/dataset/
+notebooks/dataset.zip
 
 # Python
 __pycache__/
