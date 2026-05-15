@@ -1,0 +1,19 @@
+data_injection_config:
+  zip_file_name: dataset.zip
+  bucket_name: assig-reco-to-be-deleted
+
+data_transformation_config:
+  img_size: 224
+  degree_n: -20
+  degree_p: +20
+  train_ratio: 0.6
+  valid_ratio: 0.2
+  std: [0.229, 0.224, 0.225]
+  mean: [0.485, 0.456, 0.406]
+
+model_trainer_config:
+  epochs: 10
+  lr: 0.001
+  batch_size: 32
+  num_workers: 4
+
