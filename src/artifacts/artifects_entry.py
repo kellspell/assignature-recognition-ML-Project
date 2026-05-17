@@ -27,4 +27,19 @@ class ModelTrainerArtifacts:
     
     def to_dict(self):
         return self.__dict__ 
+    
+# Model evaluation artifacts 
+@dataclass
+class ModelEvaluationArtifacts:
+    is_model_accepted: bool  
+    
+    def to_dict(self):
+        return self.__dict__   
         
+# Model pusher artifacts
+@dataclass
+class ModelPusherArtifacts:
+    backet_name: str 
+    
+    def to_dict(self):
+        return self.__dict__         

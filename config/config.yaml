@@ -17,3 +17,10 @@ model_trainer_config:
   batch_size: 32
   num_workers: 4
 
+model_evaluation_config:
+  batch_size: 32
+  num_workers: 4
+  bucket_name: assig-reco-to-be-deleted
+
+model_pusher_config:
+  bucket_name: assig-reco-to-be-deleted

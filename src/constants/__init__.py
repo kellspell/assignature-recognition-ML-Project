@@ -19,3 +19,8 @@ DATA_TRANSFORMATION_TEST_FILE_NAME = 'test_transformed.pkl'
 # model trainer constant
 MODEL_TRAINER_ARTIFACTS_DIR = 'ModelTrainerArtifacts'
 TRAINED_MODEL_PATH = 'model.pt'
+
+#Model Evaluation Constant
+MODEL_EVALUATION_ARTIFACTS_DIR = 'ModelEvaluationArtifacts'
+BEST_MODEL_DIR = 'best_model'
+MODEL_NAME ='model.pt'

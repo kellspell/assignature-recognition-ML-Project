@@ -25,6 +25,8 @@ A binary image classifier that distinguishes **forged** from **original** handwr
   - [Data Injection](#data-injection)
   - [Data Transformation](#data-transformation)
   - [Model Trainer](#model-trainer)
+  - [Model Evaluation](#model-evaluation)
+  - [Model Pusher](#model-pusher)
   - [Training Pipeline](#training-pipeline)
   - [Logger](#logger)
   - [Exception Handler](#exception-handler)
@@ -248,7 +250,9 @@ src/
 ├── components/
 │   ├── data_injection.py       # downloads, unzips, and cleans up the dataset
 │   ├── data_transformation.py  # applies transforms and splits dataset into train/valid/test
-│   └── model_trainer.py        # fine-tunes ResNet-34 and saves the trained model
+│   ├── model_trainer.py        # fine-tunes ResNet-34 and saves the trained model
+│   ├── model_evaluation.py     # compares trained model against best model in GCloud Storage
+│   └── model_pusher.py         # uploads the accepted model to GCloud Storage
 ├── configurations/
 │   └── gcloud_syncer.py        # gsutil wrapper for GCloud Storage transfers
 ├── constants/
@@ -295,6 +299,9 @@ Prerequisites:
 | `DATA_TRANSFORMATION_TEST_FILE_NAME` | Filename for the serialized test dataset (`test_transformed.pkl`) |
 | `MODEL_TRAINER_ARTIFACTS_DIR` | Subfolder name for model trainer outputs |
 | `TRAINED_MODEL_PATH` | Filename for the saved model (`model.pt`) |
+| `MODEL_EVALUATION_ARTIFACTS_DIR` | Subfolder name for model evaluation outputs |
+| `BEST_MODEL_DIR` | Subfolder inside evaluation artifacts where the best model is stored |
+| `MODEL_NAME` | Shared model filename used by evaluation and pusher (`model.pt`) |
 
 ---
 
@@ -356,6 +363,36 @@ Configuration and output for each pipeline stage are typed dataclasses.
 |---|---|
 | `trained_model_path` | Path to the saved `model.pt` file |
 
+**`ModelEvaluationConfig`** — built from `config/config.yaml`:
+
+| Field | Description |
+|---|---|
+| `MODEL_NAME` | Model filename (`model.pt`) |
+| `BUCKET_NAME` | GCloud Storage bucket used to store/retrieve the best model |
+| `BATCH_SIZE` | Batch size for the test dataloader during evaluation |
+| `NUM_WORKERS` | DataLoader worker count |
+| `MODEL_EVALUATION_ARTIFACTS_DIR` | Directory where evaluation artifacts are stored |
+| `BEST_MODEL_DIR` | Full path where the best model is downloaded from GCloud |
+
+**`ModelEvaluationArtifacts`** — returned after evaluation completes:
+
+| Field | Description |
+|---|---|
+| `is_model_accepted` | `True` if the newly trained model outperforms (or no prior best model exists), `False` otherwise |
+
+**`ModelPusherConfig`** — built from `config/config.yaml`:
+
+| Field | Description |
+|---|---|
+| `MODEL_NAME` | Model filename (`model.pt`) |
+| `BUCKET_NAME` | GCloud Storage bucket to push the accepted model to |
+
+**`ModelPusherArtifacts`** — returned after push completes:
+
+| Field | Description |
+|---|---|
+| `backet_name` | Name of the GCloud Storage bucket the model was uploaded to |
+
 ---
 
 ### Data Injection
@@ -416,6 +453,34 @@ Returns a `ModelTrainerArtifacts` instance with the path to the saved model.
 
 ---
 
+### Model Evaluation
+
+**File:** `src/components/model_evaluation.py`
+
+`ModelEvaluation` compares the newly trained model against the current best model stored in GCloud Storage:
+
+1. **Fetch best model** — downloads `model.pt` from the configured GCloud bucket into `BEST_MODEL_DIR`; if no model exists yet (first run), the download is skipped gracefully
+2. **Evaluate trained model** — loads the freshly trained model and runs a no-grad forward pass over the test dataloader, computing average `CrossEntropyLoss`
+3. **Compare** — if no prior best model is present, the new model is accepted automatically; otherwise the best model is also evaluated and the one with lower test loss wins
+4. **Return** — produces a `ModelEvaluationArtifacts` with `is_model_accepted = True/False`
+
+The pipeline aborts in `run_pipeline()` if `is_model_accepted` is `False`, preventing a worse model from being pushed.
+
+---
+
+### Model Pusher
+
+**File:** `src/components/model_pusher.py`
+
+`ModelPusher` uploads the accepted trained model to GCloud Storage so it becomes the new best model for future evaluation runs:
+
+1. **Upload** — calls `GCloudSync.sync_file_to_gscloud` to push the `trained_model_path` from `ModelTrainerArtifacts` to the configured bucket
+2. **Return** — produces a `ModelPusherArtifacts` with the target bucket name
+
+Only runs when `ModelEvaluationArtifacts.is_model_accepted` is `True`.
+
+---
+
 ### Training Pipeline
 
 **File:** `src/pipeline/training.py`
@@ -434,6 +499,10 @@ Stages completed so far:
 | Data Injection | `start_data_injection()` | Done |
 | Data Transformation | `start_data_transformation()` | Done |
 | Model Trainer | `start_model_trainer()` | Done |
+| Model Evaluation | `start_model_evaluation()` | Done |
+| Model Pusher | `start_model_pusher()` | Done |
+
+`run_pipeline()` gates the push stage on evaluation: if the trained model performs worse than the current best model in GCloud Storage, the pipeline raises an exception and skips the push.
 
 ---
 
