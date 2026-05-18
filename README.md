@@ -20,6 +20,7 @@ A binary image classifier that distinguishes **forged** from **original** handwr
 - [Part 2 — Production Pipeline](#part-2--production-pipeline)
   - [Project Structure](#project-structure)
   - [How to Run](#how-to-run)
+  - [Docker](#docker)
   - [Constants](#constants)
   - [Artifacts](#artifacts)
   - [Data Injection](#data-injection)
@@ -290,6 +291,51 @@ Prerequisites:
 - Conda environment activated (`tf`)
 - Google Cloud SDK installed and authenticated (`gcloud auth login`)
 - `config/config.yaml` present with the required bucket names and filenames
+
+---
+
+### Docker
+
+**Build the image:**
+```bash
+docker build -t sign .
+```
+
+**Run the container:**
+```bash
+docker run -d -p 8080:8080 sign
+```
+
+Then open `http://127.0.0.1:8080/docs`.
+
+#### GCloud Credentials in Docker
+
+The container does not have access to your local GCloud credentials by default, which means the model cannot be downloaded from GCS at prediction time.
+
+**Local development workaround** — mount your host credentials as a volume:
+```bash
+docker run -d -p 8080:8080 \
+  -v ~/.config/gcloud:/root/.config/gcloud \
+  sign
+```
+
+**Production — recommended approach:**
+
+Never bake credentials into the image. The industry standard is to inject them at runtime from a secrets manager:
+
+| Environment | Recommended approach |
+|---|---|
+| Google Kubernetes Engine (GKE) | **Workload Identity** — links the pod to a GCP service account automatically, no key files needed |
+| Any other cloud / VPS | Store the service account JSON key in a secrets manager (GCP Secret Manager, AWS Secrets Manager, HashiCorp Vault) and inject it at runtime via `GOOGLE_APPLICATION_CREDENTIALS` env variable |
+
+```bash
+docker run -d -p 8080:8080 \
+  -e GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcloud.json \
+  -v /path/to/service-account-key.json:/secrets/gcloud.json \
+  sign
+```
+
+> **Never** copy credentials into the image, commit them to git, or hardcode them in source code — anyone who pulls the image would have full access to your GCS bucket.
 
 ---
 

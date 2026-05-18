@@ -1,5 +1,5 @@
--e .
 tqdm
+email-validator>=2.0
 utils
 numpy
 cython
@@ -18,4 +18,3 @@ albumentations
 python-multipart
 pycocotools
 google-cloud-storage
-apache-airflow==2.4.3
