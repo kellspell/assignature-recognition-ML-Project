@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+src.egg-info/
+*.egg
+
+# Environments
+.env
+.venv
+env/
+venv/
+
+# Notebooks
+notebooks/
+
+# Dataset
+Dataset/
+
+# Artifacts and logs (generated at runtime)
+artifacts/
+logs/
+
+# Saved model (fetched from GCloud at runtime)
+saved-model/
+
+# Temp files
+input.jpg
+templates/
+
+# IDE
+.vscode/
+
+# Docs
+README.md
