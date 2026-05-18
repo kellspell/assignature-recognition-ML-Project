@@ -28,6 +28,8 @@ A binary image classifier that distinguishes **forged** from **original** handwr
   - [Model Evaluation](#model-evaluation)
   - [Model Pusher](#model-pusher)
   - [Training Pipeline](#training-pipeline)
+  - [Prediction Pipeline](#prediction-pipeline)
+  - [REST API](#rest-api)
   - [Logger](#logger)
   - [Exception Handler](#exception-handler)
   - [Utilities](#utilities)
@@ -42,7 +44,7 @@ A binary image classifier that distinguishes **forged** from **original** handwr
 | Model | ResNet-34 (pretrained on ImageNet, fine-tuned) |
 | Framework | PyTorch + torchvision |
 | Input | Grayscale signature images resized to 224×224 |
-| Output | Class label — `0: Forged`, `1: Original` |
+| Output | Class label — `"Forged"` or `"Original"` |
 | Saved model | `saved-model/model.pt` |
 
 ---
@@ -262,7 +264,8 @@ src/
 ├── logger/
 │   └── __init__.py             # file + stream logging setup
 ├── pipeline/
-│   └── training.py             # TrainingPipeline — orchestrates all stages
+│   ├── training.py             # TrainingPipeline — orchestrates all training stages
+│   └── prediction.py           # PredictionPipeline — loads model and runs inference
 └── utils/
     └── main_utils.py           # save/load objects, YAML reader, base64 helper
 ```
@@ -271,14 +274,22 @@ src/
 
 ### How to Run
 
+**Training pipeline only (no server):**
 ```bash
 python main.py
 ```
 
+**REST API server (train + predict via HTTP):**
+```bash
+python app.py
+```
+
+Then open `http://127.0.0.1:8080/docs` for the interactive Swagger UI.
+
 Prerequisites:
 - Conda environment activated (`tf`)
 - Google Cloud SDK installed and authenticated (`gcloud auth login`)
-- `config/config.yaml` present with `data_injection_config.bucket_name` and `data_injection_config.zip_file_name`
+- `config/config.yaml` present with the required bucket names and filenames
 
 ---
 
@@ -302,6 +313,9 @@ Prerequisites:
 | `MODEL_EVALUATION_ARTIFACTS_DIR` | Subfolder name for model evaluation outputs |
 | `BEST_MODEL_DIR` | Subfolder inside evaluation artifacts where the best model is stored |
 | `MODEL_NAME` | Shared model filename used by evaluation and pusher (`model.pt`) |
+| `APP_HOST` | FastAPI server host (`0.0.0.0`) |
+| `APP_PORT` | FastAPI server port (`8080`) |
+| `LABEL_NAME` | Class name mapping — `['Forged', 'Original']` |
 
 ---
 
@@ -503,6 +517,40 @@ Stages completed so far:
 | Model Pusher | `start_model_pusher()` | Done |
 
 `run_pipeline()` gates the push stage on evaluation: if the trained model performs worse than the current best model in GCloud Storage, the pipeline raises an exception and skips the push.
+
+---
+
+### Prediction Pipeline
+
+**File:** `src/pipeline/prediction.py`
+
+`PredictionPipeline` handles single-image inference in three steps:
+
+1. **Load image** — receives raw image bytes from the API, writes them to `input.jpg` (path configured in `config.yaml`), and opens the file with PIL
+2. **Fetch model** — downloads the best `model.pt` from GCloud Storage into `artifacts/PredictModel/`
+3. **Predict** — preprocesses the image (resize → grayscale → to tensor), runs a no-grad forward pass, applies softmax, and maps the predicted index to a class name via `LABEL_NAME`
+
+Returns `"Forged"` or `"Original"` as a string.
+
+---
+
+### REST API
+
+**File:** `app.py`
+
+FastAPI application exposing two endpoints. Interactive docs available at `http://127.0.0.1:8080/docs`.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/train` | Runs the full `TrainingPipeline` (inject → transform → train → evaluate → push) |
+| `POST` | `/predict` | Accepts an uploaded image file and returns the predicted class name |
+
+**`POST /predict` example response:**
+```json
+"Original"
+```
+
+CORS is enabled for all origins. The server binds to `0.0.0.0:8080`.
 
 ---
 

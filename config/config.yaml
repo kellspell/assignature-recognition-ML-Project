@@ -24,3 +24,10 @@ model_evaluation_config:
 
 model_pusher_config:
   bucket_name: assig-reco-to-be-deleted
+
+prediction_pipeline_config:
+  input_image: input.jpg
+  bucket_name: assig-reco-to-be-deleted
+  model_name: model.pt
+  threshold: 0.3
+
